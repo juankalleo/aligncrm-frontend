@@ -4,9 +4,20 @@ import Cookies from 'js-cookie';
 // Configuração base do cliente API
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Normalize API URL: ensure we don't duplicate '/api' or '/api/vN' segments
+const normalizedApiUrl = (() => {
+  const raw = String(API_URL || '').trim();
+  // remove trailing slashes
+  const withoutTrailing = raw.replace(/\/+$/g, '');
+  // if the provided URL already contains /api or /api/vN at the end, use as-is
+  if (/\/api(\/v\d+)?$/i.test(withoutTrailing)) return withoutTrailing;
+  // otherwise append the versioned prefix
+  return `${withoutTrailing}/api/v1`;
+})();
+
 // Criar instância do Axios
 const apiClient: AxiosInstance = axios.create({
-  baseURL: `${API_URL}/api/v1`,
+  baseURL: normalizedApiUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
