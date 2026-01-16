@@ -81,7 +81,7 @@ export default function AgendaPage() {
       const fim = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 0)
       
       const workspaceId = typeof window !== 'undefined' ? localStorage.getItem('workspaceId') : null
-      let eventosRes
+      let eventosRes: any[] = []
       if (projetoAtual && projetoAtual.id) {
         eventosRes = await agendaServico.porProjeto(projetoAtual.id)
       } else if (workspaceId) {
