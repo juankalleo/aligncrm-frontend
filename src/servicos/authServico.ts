@@ -24,12 +24,19 @@ export const authServico = {
       // API may return either a wrapped ApiResponse { sucesso, dados } or a direct { token, usuario }
       if (body?.sucesso && body?.dados) {
         setAuthToken(body.dados.token);
-        return body.dados as AuthResponse;
+        const dados = body.dados as any;
+        // normalize avatar field
+        if (dados.usuario) {
+          const u = dados.usuario;
+          dados.usuario = { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl };
+        }
+        return dados as AuthResponse;
       }
 
       if (body?.token && body?.usuario) {
         setAuthToken(body.token);
-        return { token: body.token, usuario: body.usuario } as AuthResponse;
+        const u = body.usuario as any;
+        return { token: body.token, usuario: { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } } as AuthResponse;
       }
 
       throw new ServerError(body?.mensagem || 'Erro ao fazer login', undefined, body?.erros);
@@ -81,7 +88,8 @@ export const authServico = {
     const response = await apiClient.get<ApiResponse<Usuario>>('/auth/me');
     
     if (response.data.sucesso && response.data.dados) {
-      return response.data.dados;
+      const u = response.data.dados as any;
+      return { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl };
     }
     
     throw new Error('Sessão inválida');
@@ -92,7 +100,8 @@ export const authServico = {
     const response = await apiClient.patch<ApiResponse<Usuario>>('/auth/profile', dados);
     
     if (response.data.sucesso && response.data.dados) {
-      return response.data.dados;
+      const u = response.data.dados as any;
+      return { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl };
     }
     
     throw new Error(response.data.mensagem || 'Erro ao atualizar perfil');

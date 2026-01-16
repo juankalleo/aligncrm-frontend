@@ -155,13 +155,9 @@ export default function ConfiguracoesPage() {
                       className="w-20 h-20 rounded-full object-cover"
                     />
                   ) : usuario?.avatar ? (
-                    <div className="w-20 h-20">
-                      <Avatar nome={usuario?.nome || ''} src={usuario.avatar} tamanho="xl" />
-                    </div>
+                    <Avatar nome={usuario?.nome || ''} src={usuario.avatar} tamanho="xl" className="w-20 h-20" />
                   ) : (
-                    <div className="w-20 h-20">
-                      <Avatar nome={usuario?.nome || ''} tamanho="xl" />
-                    </div>
+                    <Avatar nome={usuario?.nome || ''} tamanho="xl" className="w-20 h-20" />
                   )}
                   <label
                     htmlFor="avatar-upload"
