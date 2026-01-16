@@ -37,8 +37,8 @@ export default function LoginPage() {
       const resp = await login({ email: data.email, senha: data.senha });
       toast.success('Login realizado com sucesso!');
 
-      // Always go to project selector so user can choose or join additional groups
-      router.push('/selecionar-projeto');
+      // Always go to workspace selector so user can choose or join workspaces
+      router.push('/selecionar-workspace');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao fazer login');
     }
