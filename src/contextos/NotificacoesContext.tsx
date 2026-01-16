@@ -60,45 +60,62 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
   // Update favicon when there are unread notifications
   useEffect(() => {
     const unread = notificacoes.filter(n => !n.lida).length;
-    
+    if (typeof document === 'undefined') return;
+
+    const prevTitle = document.title;
+    const existingLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null;
+    const prevHref = existingLink?.href || null;
+    let createdLink: HTMLLinkElement | null = null;
+
     if (unread > 0) {
-      // Create a canvas to draw notification badge on favicon
       const canvas = document.createElement('canvas');
       canvas.width = 32;
       canvas.height = 32;
       const ctx = canvas.getContext('2d');
-      
+
       if (ctx) {
-        // Draw red circle with count
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
         ctx.arc(24, 8, 8, 0, 2 * Math.PI);
         ctx.fill();
-        
+
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(unread > 9 ? '9+' : String(unread), 24, 8);
-        
-        // Update favicon
-        const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement || document.createElement('link');
-        link.type = 'image/x-icon';
-        link.rel = 'shortcut icon';
-        link.href = canvas.toDataURL();
-        document.getElementsByTagName('head')[0].appendChild(link);
+
+        const dataUrl = canvas.toDataURL();
+        if (existingLink) {
+          existingLink.href = dataUrl;
+        } else {
+          createdLink = document.createElement('link');
+          createdLink.type = 'image/x-icon';
+          createdLink.rel = 'shortcut icon';
+          createdLink.href = dataUrl;
+          document.head.appendChild(createdLink);
+        }
       }
-      
-      // Update document title
+
       document.title = `(${unread}) Align CRM`;
     } else {
-      // Reset favicon and title
       document.title = 'Align CRM';
-      const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-      if (link) {
-        link.href = '/favicon.ico';
+      if (existingLink && prevHref) {
+        existingLink.href = prevHref;
       }
     }
+
+    return () => {
+      // cleanup: restore previous favicon/title if we created/modified them
+      try {
+        if (createdLink && createdLink.parentNode) createdLink.parentNode.removeChild(createdLink);
+        if (existingLink && prevHref) existingLink.href = prevHref;
+        document.title = prevTitle;
+      } catch (err) {
+        // ignore cleanup errors
+      }
+    };
   }, [notificacoes]);
 
   const naoLidas = notificacoes.filter(n => !n.lida).length;

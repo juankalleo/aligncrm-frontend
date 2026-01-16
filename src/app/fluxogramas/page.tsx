@@ -49,11 +49,23 @@ export default function FluxogramasPage() {
   // Inject Excalidraw stylesheet at runtime to avoid build-time module resolution issues
   useEffect(() => {
     const href = 'https://unpkg.com/@excalidraw/excalidraw/dist/excalidraw.min.css'
-    if (typeof document !== 'undefined' && !document.querySelector(`link[href="${href}"]`)) {
+    if (typeof document === 'undefined') return;
+    const existing = document.querySelector(`link[href="${href}"]`) as HTMLLinkElement | null;
+    let created: HTMLLinkElement | null = null;
+    if (!existing) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
       link.href = href
       document.head.appendChild(link)
+      created = link
+    }
+
+    return () => {
+      try {
+        if (created && created.parentNode) created.parentNode.removeChild(created);
+      } catch (err) {
+        // ignore
+      }
     }
   }, [])
   
