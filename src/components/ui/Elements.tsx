@@ -133,6 +133,17 @@ export function Avatar({ nome, src, tamanho = 'md', className }: AvatarProps) {
   };
 
   const backgroundColor = stringParaCor(nome);
+  const resolveSrc = (s?: string) => {
+    if (!s) return undefined;
+    // absolute URL -> use as-is
+    if (/^https?:\/\//i.test(s)) return s;
+    // relative path from backend (starts with '/') -> prefix API base
+    if (s.startsWith('/')) {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/g, '');
+      return apiBase ? `${apiBase}${s}` : s;
+    }
+    return s;
+  };
 
   return (
     <div
@@ -144,7 +155,7 @@ export function Avatar({ nome, src, tamanho = 'md', className }: AvatarProps) {
       style={{ backgroundColor }}
     >
       {src ? (
-        <img src={src} alt={nome} className="w-full h-full object-cover" />
+        <img src={resolveSrc(src)} alt={nome} className="w-full h-full object-cover" />
       ) : (
         gerarIniciais(nome)
       )}
