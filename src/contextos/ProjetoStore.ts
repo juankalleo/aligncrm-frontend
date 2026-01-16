@@ -47,7 +47,11 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       const response = workspaceId ? await projetoServico.listarPorWorkspace(workspaceId) : await projetoServico.listar();
       // normalize
       const dados = (response as any).dados || (response as any) || []
-      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeUsuario = (u: any) => {
+        if (!u) return u
+        const resolved = u.avatar || u.avatar_url || u.avatarUrl || null
+        return { ...u, avatar: resolved, avatarUrl: resolved, avatar_url: resolved }
+      }
       const normalizeProjeto = (p: any) => ({
         ...p,
         proprietario: normalizeUsuario(p.proprietario),
@@ -76,7 +80,11 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       } catch (e) {
         // ignore
       }
-      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeUsuario = (u: any) => {
+        if (!u) return u
+        const resolved = u.avatar || u.avatar_url || u.avatarUrl || null
+        return { ...u, avatar: resolved, avatarUrl: resolved, avatar_url: resolved }
+      }
       const normalizeProjeto = (p: any) => ({
         ...p,
         proprietario: normalizeUsuario(p.proprietario),
@@ -171,7 +179,11 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       } else {
         response = await tarefaServico.listarPorProjeto(projetoId);
       }
-      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeUsuario = (u: any) => {
+        if (!u) return u
+        const resolved = u.avatar || u.avatar_url || u.avatarUrl || null
+        return { ...u, avatar: resolved, avatarUrl: resolved, avatar_url: resolved }
+      }
       const normalizeProjeto = (p: any) => ({
         ...p,
         proprietario: normalizeUsuario(p.proprietario),
@@ -306,23 +318,23 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
 
   atualizarAvatarUsuario: (usuarioId, avatar) => {
     set(state => ({
-      projetos: state.projetos.map(p => {
-        const proprietario = p.proprietario && p.proprietario.id === usuarioId ? { ...p.proprietario, avatar } : p.proprietario;
-        const membros = p.membros ? p.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : p.membros;
+        projetos: state.projetos.map(p => {
+        const proprietario = p.proprietario && p.proprietario.id === usuarioId ? { ...p.proprietario, avatar, avatarUrl: avatar, avatar_url: avatar } : p.proprietario;
+        const membros = p.membros ? p.membros.map(m => (m.id === usuarioId ? { ...m, avatar, avatarUrl: avatar, avatar_url: avatar } : m)) : p.membros;
         return { ...p, proprietario, membros } as Projeto;
       }),
-      projetoAtual: state.projetoAtual ? {
+        projetoAtual: state.projetoAtual ? {
         ...state.projetoAtual,
-        proprietario: state.projetoAtual.proprietario && state.projetoAtual.proprietario.id === usuarioId ? { ...state.projetoAtual.proprietario, avatar } : state.projetoAtual.proprietario,
-        membros: state.projetoAtual.membros ? state.projetoAtual.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : state.projetoAtual.membros,
+        proprietario: state.projetoAtual.proprietario && state.projetoAtual.proprietario.id === usuarioId ? { ...state.projetoAtual.proprietario, avatar, avatarUrl: avatar, avatar_url: avatar } : state.projetoAtual.proprietario,
+        membros: state.projetoAtual.membros ? state.projetoAtual.membros.map(m => (m.id === usuarioId ? { ...m, avatar, avatarUrl: avatar, avatar_url: avatar } : m)) : state.projetoAtual.membros,
       } : state.projetoAtual,
       tarefas: state.tarefas.map(t => ({
         ...t,
-        responsavel: t.responsavel && t.responsavel.id === usuarioId ? { ...t.responsavel, avatar } : t.responsavel,
+        responsavel: t.responsavel && t.responsavel.id === usuarioId ? { ...t.responsavel, avatar, avatarUrl: avatar, avatar_url: avatar } : t.responsavel,
         projeto: t.projeto ? {
           ...t.projeto,
-          proprietario: t.projeto.proprietario && t.projeto.proprietario.id === usuarioId ? { ...t.projeto.proprietario, avatar } : t.projeto.proprietario,
-          membros: t.projeto.membros ? t.projeto.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : t.projeto.membros,
+          proprietario: t.projeto.proprietario && t.projeto.proprietario.id === usuarioId ? { ...t.projeto.proprietario, avatar, avatarUrl: avatar, avatar_url: avatar } : t.projeto.proprietario,
+          membros: t.projeto.membros ? t.projeto.membros.map(m => (m.id === usuarioId ? { ...m, avatar, avatarUrl: avatar, avatar_url: avatar } : m)) : t.projeto.membros,
         } : t.projeto,
       })),
     }));

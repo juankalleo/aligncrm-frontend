@@ -100,9 +100,10 @@ export default function ConfiguracoesPage() {
       toast.success('Foto de perfil atualizada!')
 
       // Atualiza apenas o estado local do usuário (já foi feito o upload)
-      atualizarUsuarioLocal({ avatar: avatarUrl })
-        // Também atualiza cópias do usuário armazenadas em projetos/tarefas
-        try { atualizarAvatarNoProjetoStore(usuario.id, avatarUrl) } catch (e) { /* ignore */ }
+      const payload = { avatar: avatarUrl, avatarUrl: avatarUrl, avatar_url: avatarUrl }
+      atualizarUsuarioLocal(payload)
+      // Também atualiza cópias do usuário armazenadas em projetos/tarefas
+      try { atualizarAvatarNoProjetoStore(usuario.id, avatarUrl) } catch (e) { /* ignore */ }
       
       setAvatarFile(null)
       setAvatarPreview(null)
