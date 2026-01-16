@@ -36,7 +36,10 @@ export default function SelecionarWorkspacePage() {
 
   const handleEnterWorkspace = (workspaceId: string) => {
     try { localStorage.setItem('workspaceId', workspaceId) } catch (e) {}
-    router.push(`/${workspaceId}/dashboard`);
+    // Use setTimeout to avoid DOM manipulation issues during navigation
+    setTimeout(() => {
+      router.push(`/${workspaceId}/dashboard`);
+    }, 0);
   }
 
   return (
