@@ -37,10 +37,8 @@ export default function LoginPage() {
       const resp = await login({ email: data.email, senha: data.senha });
       toast.success('Login realizado com sucesso!');
 
-      // Use setTimeout to avoid DOM manipulation issues during navigation
-      setTimeout(() => {
-        router.push('/selecionar-workspace');
-      }, 100);
+      // Use window.location for navigation to avoid React DOM issues
+      window.location.href = '/selecionar-workspace';
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao fazer login');
     }
