@@ -53,7 +53,7 @@ const sidebarIcones: Record<SidebarEstilo, React.ElementType> = {
 
 export default function ConfiguracoesPage() {
   const { tema, setTema, sidebarEstilo, setSidebarEstilo } = useTema()
-  const { usuario, atualizarPerfil } = useAuth()
+  const { usuario, atualizarUsuarioLocal } = useAuth()
   
   const [formPerfil, setFormPerfil] = React.useState({
     nome: usuario?.nome || '',
@@ -96,9 +96,9 @@ export default function ConfiguracoesPage() {
     try {
       const avatarUrl = await usuarioServico.uploadAvatar(usuario.id, avatarFile)
       toast.success('Foto de perfil atualizada!')
-      
-      // Update user context with new avatar
-      await atualizarPerfil({ avatar: avatarUrl })
+
+      // Atualiza apenas o estado local do usuário (já foi feito o upload)
+      atualizarUsuarioLocal({ avatar: avatarUrl })
       
       setAvatarFile(null)
       setAvatarPreview(null)

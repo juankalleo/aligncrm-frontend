@@ -13,6 +13,7 @@ interface AuthContextType {
   registrar: (dados: RegistroCredenciais) => Promise<void>;
   logout: () => Promise<void>;
   atualizarPerfil: (dados: Partial<Usuario>) => Promise<void>;
+  atualizarUsuarioLocal: (dados: Partial<Usuario>) => void;
   verificarAuth: () => Promise<void>;
 }
 
@@ -79,6 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUsuario(usuarioAtualizado);
   };
 
+  const atualizarUsuarioLocal = (dados: Partial<Usuario>) => {
+    setUsuario((u) => (u ? { ...u, ...dados } : u));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -89,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         registrar,
         logout,
         atualizarPerfil,
+        atualizarUsuarioLocal,
         verificarAuth,
       }}
     >
