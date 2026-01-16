@@ -133,6 +133,8 @@ export function Avatar({ nome, src, tamanho = 'md', className }: AvatarProps) {
   };
 
   const backgroundColor = stringParaCor(nome);
+  const [imgError, setImgError] = React.useState(false);
+
   const resolveSrc = (s?: string) => {
     if (!s) return undefined;
     // absolute URL -> use as-is
@@ -154,8 +156,15 @@ export function Avatar({ nome, src, tamanho = 'md', className }: AvatarProps) {
       )}
       style={{ backgroundColor }}
     >
-      {src ? (
-        <img src={resolveSrc(src)} alt={nome} className="w-full h-full object-cover" />
+      {src && !imgError ? (
+        <img
+          src={resolveSrc(src)}
+          alt={nome}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          onLoad={() => setImgError(false)}
+          style={{ display: 'block' }}
+        />
       ) : (
         gerarIniciais(nome)
       )}
