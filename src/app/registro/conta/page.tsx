@@ -1,7 +1,4 @@
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
-
-'use client';
+ 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,9 +11,6 @@ import { Button, Input } from '@/components/ui';
 import { useAuth } from '@/contextos';
 import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// Força renderização dinâmica para usar useSearchParams
-export const dynamic = 'force-dynamic';
 
 const registroSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
