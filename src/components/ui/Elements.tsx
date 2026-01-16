@@ -40,10 +40,13 @@ export function Card({ children, className, hover = false, onClick, style }: Car
 interface BadgeProps {
   children: React.ReactNode;
   variante?: 'default' | 'success' | 'warning' | 'error' | 'info';
+  // alias
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
   className?: string;
 }
 
-export function Badge({ children, variante = 'default', className }: BadgeProps) {
+export function Badge({ children, variante = 'default', variant, className }: BadgeProps) {
+  const selected = variant || variante;
   const variantClasses = {
     default: 'bg-light-hover dark:bg-dark-hover text-light-text dark:text-dark-text',
     success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -56,7 +59,7 @@ export function Badge({ children, variante = 'default', className }: BadgeProps)
     <span
       className={cn(
         'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-        variantClasses[variante],
+        variantClasses[selected as keyof typeof variantClasses],
         className
       )}
     >
@@ -244,17 +247,25 @@ export function EmptyState({ icone, titulo, descricao, acao }: EmptyStateProps) 
 // PROGRESS BAR
 // ============================================
 interface ProgressBarProps {
-  valor: number;
+  valor?: number;
+  // alias for older callers
+  progresso?: number;
   max?: number;
   showLabel?: boolean;
   className?: string;
+  // legacy aliases
+  altura?: string;
+  cor?: string;
 }
 
-export function ProgressBar({ valor, max = 100, showLabel = false, className }: ProgressBarProps) {
-  const porcentagem = Math.min(100, Math.max(0, (valor / max) * 100));
+export function ProgressBar({ valor, progresso, max = 100, showLabel = false, className, altura, cor }: ProgressBarProps) {
+  const value = typeof valor === 'number' ? valor : (typeof progresso === 'number' ? progresso : 0);
+  const porcentagem = Math.min(100, Math.max(0, (value / max) * 100));
+  const finalClass = cn('w-full', className, altura || '');
+  const innerClass = cor || 'bg-gradient-to-r from-align-500 to-align-600';
 
   return (
-    <div className={cn('w-full', className)}>
+    <div className={finalClass}>
       {showLabel && (
         <div className="flex justify-between mb-1 text-sm">
           <span className="text-light-muted dark:text-dark-muted">Progresso</span>
@@ -265,7 +276,7 @@ export function ProgressBar({ valor, max = 100, showLabel = false, className }: 
       )}
       <div className="h-2 bg-light-hover dark:bg-dark-hover rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-align-500 to-align-600 rounded-full transition-all duration-300"
+          className={`h-full ${innerClass} rounded-full transition-all duration-300`}
           style={{ width: `${porcentagem}%` }}
         />
       </div>

@@ -8,6 +8,8 @@ import { cn } from '@/utils';
 // ============================================
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variante?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  // alias in English for some callers
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   tamanho?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   iconeEsquerda?: React.ReactNode;
@@ -17,6 +19,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({
   children,
   variante = 'primary',
+  variant,
   tamanho = 'md',
   isLoading = false,
   iconeEsquerda,
@@ -25,6 +28,7 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  const selectedVariant = variant || variante;
   const variantClasses = {
     primary: 'bg-align-600 text-white hover:bg-align-700 active:bg-align-800 focus:ring-align-500',
     secondary: 'bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover',
@@ -45,7 +49,7 @@ export function Button({
         'transition-all duration-200',
         'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-bg',
         'disabled:opacity-50 disabled:cursor-not-allowed',
-        variantClasses[variante],
+        variantClasses[selectedVariant as keyof typeof variantClasses],
         sizeClasses[tamanho],
         className
       )}

@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import MainLayout from '@/layouts/MainLayout'
-import { Card, ProgressBar, Avatar, Badge, Button } from '@/components/ui/Elements'
+import { Card, ProgressBar, Avatar, Badge } from '@/components/ui/Elements'
+import { Button } from '@/components/ui'
 import { 
   Calendar, 
   Clock, 
@@ -36,8 +37,8 @@ export default function DashboardPage() {
   const [projetos, setProjetos] = useState<any[]>([])
   const [recentTasks, setRecentTasks] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
-  const [tasksByStatus, setTasksByStatus] = useState<any>({})
-  const [tasksByPriority, setTasksByPriority] = useState<any>({})
+  const [tasksByStatus, setTasksByStatus] = useState<Record<string, number>>({})
+  const [tasksByPriority, setTasksByPriority] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const carregar = async () => {
@@ -86,26 +87,28 @@ export default function DashboardPage() {
           const todas = tarefasPage.dados || []
 
           const tarefasTotal = todas.length
-          const tarefasConcluidas = todas.filter(t => t.status === 'concluida').length
-          const tarefasEmProgresso = todas.filter(t => t.status === 'em_progresso').length
-          const tarefasPendentes = todas.filter(t => t.status === 'pendente').length
+          const tarefasConcluidas = todas.filter(t => (t as any).status === 'concluida').length
+          const tarefasEmProgresso = todas.filter(t => (t as any).status === 'em_progresso').length
+          const tarefasPendentes = todas.filter(t => (t as any).status === 'pendente').length
           const tarefasAtrasadas = todas.filter(t => {
-            if (t.dataVencimento && t.status !== 'concluida') {
-              const vencimento = new Date(t.dataVencimento)
+            if ((t as any).dataVencimento && (t as any).status !== 'concluida') {
+              const vencimento = new Date((t as any).dataVencimento)
               return vencimento < new Date()
             }
             return false
           }).length
 
           // Calculate task distributions
-          const byStatus = todas.reduce((acc, t) => {
-            acc[t.status] = (acc[t.status] || 0) + 1
+          const byStatus = todas.reduce((acc: Record<string, number>, t: any) => {
+            const key = String(t.status || 'unknown')
+            acc[key] = (acc[key] || 0) + 1
             return acc
           }, {})
           setTasksByStatus(byStatus)
 
-          const byPriority = todas.reduce((acc, t) => {
-            acc[t.prioridade] = (acc[t.prioridade] || 0) + 1
+          const byPriority = todas.reduce((acc: Record<string, number>, t: any) => {
+            const key = String(t.prioridade || 'media')
+            acc[key] = (acc[key] || 0) + 1
             return acc
           }, {})
           setTasksByPriority(byPriority)
@@ -313,9 +316,8 @@ export default function DashboardPage() {
               </span>
             </div>
             <ProgressBar 
-              progresso={stats.taxaConclusao || 0} 
-              altura="h-3"
-              cor="bg-gradient-to-r from-align-500 to-align-600"
+              valor={stats.taxaConclusao || 0} 
+              className="h-3"
             />
             <div className="flex justify-between mt-2 text-xs text-gray-500">
               <span>{stats.tarefasConcluidas} concluídas</span>
@@ -355,7 +357,7 @@ export default function DashboardPage() {
                         {count} ({percentage}%)
                       </span>
                     </div>
-                    <ProgressBar progresso={percentage} altura="h-2" />
+                    <ProgressBar valor={percentage} className="h-2" />
                   </div>
                 )
               })}
@@ -390,7 +392,7 @@ export default function DashboardPage() {
                         {count} ({percentage}%)
                       </span>
                     </div>
-                    <ProgressBar progresso={percentage} altura="h-2" />
+                    <ProgressBar valor={percentage} className="h-2" />
                   </div>
                 )
               })}
@@ -444,7 +446,7 @@ export default function DashboardPage() {
                 <CheckCircle2 className="w-5 h-5 text-align-600" />
                 <h3 className="font-semibold text-gray-900 dark:text-white">Tarefas Recentes</h3>
               </div>
-              <Badge variant="info">{recentTasks.length}</Badge>
+              <Badge variante="info">{recentTasks.length}</Badge>
             </div>
             <div className="space-y-3">
               {recentTasks.length === 0 ? (
@@ -469,10 +471,10 @@ export default function DashboardPage() {
                           <span className={`text-xs px-2 py-0.5 rounded ${getPriorityColor(t.prioridade)}`}>
                             {t.prioridade}
                           </span>
-                          {t.dataVencimento && (
+                          {(t as any).dataVencimento && (
                             <span className="text-xs text-gray-500 flex items-center gap-1">
                               <CalendarDays className="w-3 h-3" />
-                              {new Date(t.dataVencimento).toLocaleDateString('pt-BR')}
+                              {new Date((t as any).dataVencimento).toLocaleDateString('pt-BR')}
                             </span>
                           )}
                         </div>
@@ -491,7 +493,7 @@ export default function DashboardPage() {
                 <Activity className="w-5 h-5 text-align-600" />
                 <h3 className="font-semibold text-gray-900 dark:text-white">Atividade Recente</h3>
               </div>
-              <Badge variant="info">{recentActivities.length}</Badge>
+              <Badge variante="info">{recentActivities.length}</Badge>
             </div>
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
               {recentActivities.length === 0 ? (
