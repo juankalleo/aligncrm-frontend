@@ -16,14 +16,32 @@ export class ServerError extends Error {
 export const authServico = {
   // Login
   async login(credenciais: LoginCredenciais): Promise<AuthResponse> {
-    const response = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', credenciais);
-    
-    if (response.data.sucesso && response.data.dados) {
-      setAuthToken(response.data.dados.token);
-      return response.data.dados;
+    try {
+      const response = await apiClient.post('/auth/login', credenciais);
+
+      const body: any = response.data;
+
+      // API may return either a wrapped ApiResponse { sucesso, dados } or a direct { token, usuario }
+      if (body?.sucesso && body?.dados) {
+        setAuthToken(body.dados.token);
+        return body.dados as AuthResponse;
+      }
+
+      if (body?.token && body?.usuario) {
+        setAuthToken(body.token);
+        return { token: body.token, usuario: body.usuario } as AuthResponse;
+      }
+
+      throw new ServerError(body?.mensagem || 'Erro ao fazer login', undefined, body?.erros);
+    } catch (err: any) {
+      // Axios/network error -> surface server message if available
+      if (err?.response?.data) {
+        const body = err.response.data;
+        const msg = body.mensagem || (body.erros ? body.erros.join('; ') : 'Erro ao fazer login');
+        throw new ServerError(msg, err.response.status, body.erros);
+      }
+      throw err;
     }
-    
-    throw new Error(response.data.mensagem || 'Erro ao fazer login');
   },
   
   // Registro
