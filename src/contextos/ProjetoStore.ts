@@ -29,6 +29,7 @@ interface ProjetoState {
   // Utilitários
   limparErro: () => void;
   resetar: () => void;
+  atualizarAvatarUsuario: (usuarioId: string, avatar: string) => void;
 }
 
 export const useProjetoStore = create<ProjetoState>((set, get) => ({
@@ -46,7 +47,13 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       const response = workspaceId ? await projetoServico.listarPorWorkspace(workspaceId) : await projetoServico.listar();
       // normalize
       const dados = (response as any).dados || (response as any) || []
-      set({ projetos: dados, isLoading: false });
+      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeProjeto = (p: any) => ({
+        ...p,
+        proprietario: normalizeUsuario(p.proprietario),
+        membros: p.membros ? p.membros.map((m: any) => normalizeUsuario(m)) : p.membros,
+      })
+      set({ projetos: dados.map((p: any) => normalizeProjeto(p)), isLoading: false });
     } catch (error) {
       set({ 
         erro: error instanceof Error ? error.message : 'Erro ao carregar projetos',
@@ -69,9 +76,21 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       } catch (e) {
         // ignore
       }
+      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeProjeto = (p: any) => ({
+        ...p,
+        proprietario: normalizeUsuario(p.proprietario),
+        membros: p.membros ? p.membros.map((m: any) => normalizeUsuario(m)) : p.membros,
+      })
+      const projetoNorm = normalizeProjeto(projeto)
+      const tarefasNorm = (tarefasResponse.dados || []).map((t: any) => ({
+        ...t,
+        responsavel: normalizeUsuario(t.responsavel),
+        projeto: t.projeto ? normalizeProjeto(t.projeto) : t.projeto,
+      }))
       set({ 
-        projetoAtual: projeto, 
-        tarefas: tarefasResponse.dados,
+        projetoAtual: projetoNorm, 
+        tarefas: tarefasNorm,
         isLoading: false 
       });
     } catch (error) {
@@ -152,7 +171,18 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       } else {
         response = await tarefaServico.listarPorProjeto(projetoId);
       }
-      set({ tarefas: response.dados, isLoading: false });
+      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeProjeto = (p: any) => ({
+        ...p,
+        proprietario: normalizeUsuario(p.proprietario),
+        membros: p.membros ? p.membros.map((m: any) => normalizeUsuario(m)) : p.membros,
+      })
+      const tarefasNorm = (response.dados || []).map((t: any) => ({
+        ...t,
+        responsavel: normalizeUsuario(t.responsavel),
+        projeto: t.projeto ? normalizeProjeto(t.projeto) : t.projeto,
+      }))
+      set({ tarefas: tarefasNorm, isLoading: false });
     } catch (error) {
       set({ 
         erro: error instanceof Error ? error.message : 'Erro ao carregar tarefas',
@@ -166,7 +196,18 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
     set({ isLoading: true, erro: null });
     try {
       const response = await tarefaServico.listarPorWorkspace(workspaceId);
-      set({ tarefas: response.dados, isLoading: false });
+      const normalizeUsuario = (u: any) => (u ? { ...u, avatar: u.avatar || u.avatar_url || u.avatarUrl } : u)
+      const normalizeProjeto = (p: any) => ({
+        ...p,
+        proprietario: normalizeUsuario(p.proprietario),
+        membros: p.membros ? p.membros.map((m: any) => normalizeUsuario(m)) : p.membros,
+      })
+      const tarefasNorm = (response.dados || []).map((t: any) => ({
+        ...t,
+        responsavel: normalizeUsuario(t.responsavel),
+        projeto: t.projeto ? normalizeProjeto(t.projeto) : t.projeto,
+      }))
+      set({ tarefas: tarefasNorm, isLoading: false });
     } catch (error) {
       set({ 
         erro: error instanceof Error ? error.message : 'Erro ao carregar tarefas do workspace',
@@ -262,6 +303,30 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
     isLoading: false,
     erro: null
   }),
+
+  atualizarAvatarUsuario: (usuarioId, avatar) => {
+    set(state => ({
+      projetos: state.projetos.map(p => {
+        const proprietario = p.proprietario && p.proprietario.id === usuarioId ? { ...p.proprietario, avatar } : p.proprietario;
+        const membros = p.membros ? p.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : p.membros;
+        return { ...p, proprietario, membros } as Projeto;
+      }),
+      projetoAtual: state.projetoAtual ? {
+        ...state.projetoAtual,
+        proprietario: state.projetoAtual.proprietario && state.projetoAtual.proprietario.id === usuarioId ? { ...state.projetoAtual.proprietario, avatar } : state.projetoAtual.proprietario,
+        membros: state.projetoAtual.membros ? state.projetoAtual.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : state.projetoAtual.membros,
+      } : state.projetoAtual,
+      tarefas: state.tarefas.map(t => ({
+        ...t,
+        responsavel: t.responsavel && t.responsavel.id === usuarioId ? { ...t.responsavel, avatar } : t.responsavel,
+        projeto: t.projeto ? {
+          ...t.projeto,
+          proprietario: t.projeto.proprietario && t.projeto.proprietario.id === usuarioId ? { ...t.projeto.proprietario, avatar } : t.projeto.proprietario,
+          membros: t.projeto.membros ? t.projeto.membros.map(m => (m.id === usuarioId ? { ...m, avatar } : m)) : t.projeto.membros,
+        } : t.projeto,
+      })),
+    }));
+  },
 }));
 
 export default useProjetoStore;

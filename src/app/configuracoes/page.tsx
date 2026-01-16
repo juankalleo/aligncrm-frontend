@@ -24,6 +24,7 @@ import { Card, Avatar } from '@/components/ui/Elements'
 import { Input, Select, Textarea } from '@/components/ui/Form'
 import { useTema, Tema, SidebarEstilo } from '@/contextos/TemaContext'
 import { useAuth } from '@/contextos/AuthContext'
+import { useProjetoStore } from '@/contextos/ProjetoStore'
 import { usuarioServico } from '@/servicos/usuarioServico'
 import toast from 'react-hot-toast'
 
@@ -54,6 +55,7 @@ const sidebarIcones: Record<SidebarEstilo, React.ElementType> = {
 export default function ConfiguracoesPage() {
   const { tema, setTema, sidebarEstilo, setSidebarEstilo } = useTema()
   const { usuario, atualizarUsuarioLocal } = useAuth()
+  const atualizarAvatarNoProjetoStore = useProjetoStore(state => state.atualizarAvatarUsuario)
   
   const [formPerfil, setFormPerfil] = React.useState({
     nome: usuario?.nome || '',
@@ -99,6 +101,8 @@ export default function ConfiguracoesPage() {
 
       // Atualiza apenas o estado local do usuário (já foi feito o upload)
       atualizarUsuarioLocal({ avatar: avatarUrl })
+        // Também atualiza cópias do usuário armazenadas em projetos/tarefas
+        try { atualizarAvatarNoProjetoStore(usuario.id, avatarUrl) } catch (e) { /* ignore */ }
       
       setAvatarFile(null)
       setAvatarPreview(null)
