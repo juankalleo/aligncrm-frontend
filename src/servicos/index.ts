@@ -9,3 +9,4 @@ export { default as agendaServico } from './agendaServico';
 export { arquivoServico, linkServico } from './arquivosServico';
 export { default as fluxogramaServico } from './fluxogramaServico';
 export { default as workspaceServico } from './workspaceServico';
+export { default as dominioServico } from './dominioServico';

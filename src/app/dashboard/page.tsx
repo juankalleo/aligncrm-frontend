@@ -1,9 +1,11 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import MainLayout from '@/layouts/MainLayout'
 import { Card, ProgressBar, Avatar, Badge } from '@/components/ui/Elements'
 import { Button } from '@/components/ui'
+import { motion } from 'framer-motion'
 import { 
   Calendar, 
   Clock, 
@@ -26,19 +28,34 @@ import { projetoServico } from '@/servicos/projetoServico'
 import { historicoServico } from '@/servicos/historicoServico'
 import { tarefaServico } from '@/servicos/tarefaServico'
 import { workspaceServico } from '@/servicos/workspaceServico'
-import StorageIndicator from '@/components/workspace/StorageIndicator'
+import { usuarioServico } from '@/servicos'
 
 export default function DashboardPage() {
+  const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
   const projetoAtual = useProjetoStore(state => state.projetoAtual)
-  const workspaceId = typeof window !== 'undefined' ? localStorage.getItem('workspaceId') : null
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+
+  // Read workspaceId on client after mount to avoid hydration mismatch
+  useEffect(() => {
+    try {
+      const id = localStorage.getItem('workspaceId')
+      setWorkspaceId(id)
+    } catch (e) {
+      setWorkspaceId(null)
+    }
+  }, [])
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<any | null>(null)
   const [workspace, setWorkspace] = useState<any | null>(null)
   const [projetos, setProjetos] = useState<any[]>([])
+  const [workspaceUsers, setWorkspaceUsers] = useState<any[]>([])
+  const [userSummaries, setUserSummaries] = useState<any[]>([])
   const [recentTasks, setRecentTasks] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
   const [tasksByStatus, setTasksByStatus] = useState<Record<string, number>>({})
   const [tasksByPriority, setTasksByPriority] = useState<Record<string, number>>({})
+  const [chartSeries, setChartSeries] = useState<any[]>([])
+  const [chartOptions, setChartOptions] = useState<any>({})
 
   useEffect(() => {
     const carregar = async () => {
@@ -86,13 +103,79 @@ export default function DashboardPage() {
           const tarefasPage = await tarefaServico.listarPorWorkspace(workspaceId, 1, 1000, true)
           const todas = tarefasPage.dados || []
 
+          // Build monthly series for last 12 months: created vs completed
+          try {
+            const now = new Date()
+            const months: string[] = []
+            const createdCounts: number[] = []
+            const completedCounts: number[] = []
+
+            for (let i = 11; i >= 0; i--) {
+              const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+              const monthLabel = d.toLocaleString('default', { month: 'short', year: 'numeric' })
+              months.push(monthLabel)
+              const start = new Date(d.getFullYear(), d.getMonth(), 1)
+              const end = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+
+              const created = todas.filter((t: any) => {
+                const c = t.criadoEm || t.created_at || t.criado_em
+                if (!c) return false
+                const cd = new Date(c)
+                return cd >= start && cd < end
+              }).length
+
+              const completed = todas.filter((t: any) => {
+                const status = (typeof t.status === 'string') ? t.status : (t.status && t.status.slug) || (t.status && t.status.nome) || t.status
+                if (status !== 'concluida') return false
+                const u = t.atualizadoEm || t.updated_at || t.atualizado_em || t.criadoEm
+                if (!u) return false
+                const ud = new Date(u)
+                return ud >= start && ud < end
+              }).length
+
+              createdCounts.push(created)
+              completedCounts.push(completed)
+            }
+
+            setChartSeries([
+              { name: 'Created', data: createdCounts },
+              { name: 'Completed', data: completedCounts }
+            ])
+
+            setChartOptions({
+              chart: { toolbar: { show: false }, animations: { enabled: true }, foreColor: '#cbd5e1' },
+              colors: ['#60a5fa', '#34d399'],
+              xaxis: { categories: months },
+              stroke: { curve: 'smooth' },
+              grid: { borderColor: '#0f1724' },
+              tooltip: { theme: 'dark' },
+              legend: { position: 'top' },
+            })
+          } catch (e) {
+            console.warn('Erro ao gerar séries do gráfico:', e)
+          }
+
+          // Helpers to normalize status and priority shapes
+          const getStatus = (t: any) => {
+            if (!t) return 'unknown'
+            if (typeof t.status === 'string') return t.status
+            if (t.status && typeof t.status === 'object') return t.status.slug || t.status.codigo || t.status.nome || (t.status.value && String(t.status.value)) || 'unknown'
+            return t.status || 'unknown'
+          }
+          const getPriority = (t: any) => {
+            if (!t) return 'media'
+            if (typeof t.prioridade === 'string') return t.prioridade
+            if (t.prioridade && typeof t.prioridade === 'object') return t.prioridade.slug || t.prioridade.nome || 'media'
+            return t.prioridade || 'media'
+          }
+
           const tarefasTotal = todas.length
-          const tarefasConcluidas = todas.filter(t => (t as any).status === 'concluida').length
-          const tarefasEmProgresso = todas.filter(t => (t as any).status === 'em_progresso').length
-          const tarefasPendentes = todas.filter(t => (t as any).status === 'pendente').length
+          const tarefasConcluidas = todas.filter(t => getStatus(t) === 'concluida').length
+          const tarefasEmProgresso = todas.filter(t => getStatus(t) === 'em_progresso').length
+          const tarefasPendentes = todas.filter(t => getStatus(t) === 'pendente').length
           const tarefasAtrasadas = todas.filter(t => {
-            if ((t as any).dataVencimento && (t as any).status !== 'concluida') {
-              const vencimento = new Date((t as any).dataVencimento)
+            if (t?.dataVencimento && getStatus(t) !== 'concluida') {
+              const vencimento = new Date(t.dataVencimento)
               return vencimento < new Date()
             }
             return false
@@ -100,24 +183,30 @@ export default function DashboardPage() {
 
           // Calculate task distributions
           const byStatus = todas.reduce((acc: Record<string, number>, t: any) => {
-            const key = String(t.status || 'unknown')
+            const key = String(getStatus(t) || 'unknown')
             acc[key] = (acc[key] || 0) + 1
             return acc
           }, {})
           setTasksByStatus(byStatus)
 
           const byPriority = todas.reduce((acc: Record<string, number>, t: any) => {
-            const key = String(t.prioridade || 'media')
+            const key = String(getPriority(t) || 'media')
             acc[key] = (acc[key] || 0) + 1
             return acc
           }, {})
           setTasksByPriority(byPriority)
 
+          // Helpers to extract user id from possible task shapes
+          const getResponsavelId = (t: any) => t?.responsavel?.id || t?.responsavelId || t?.responsavel_id || null
+          const getCriadorId = (t: any) => t?.criador?.id || t?.criadorId || t?.criador_id || null
+
           // Estimate members active by unique responsavel/creator ids in tasks
           const membroIds = new Set<string>()
           todas.forEach(t => {
-            if ((t as any).responsavelId) membroIds.add((t as any).responsavelId)
-            if ((t as any).criadorId) membroIds.add((t as any).criadorId)
+            const r = getResponsavelId(t)
+            const c = getCriadorId(t)
+            if (r) membroIds.add(r)
+            if (c) membroIds.add(c)
           })
 
           setStats({
@@ -133,6 +222,28 @@ export default function DashboardPage() {
 
           const recent = await tarefaServico.listarPorWorkspace(workspaceId, 1, 8)
           setRecentTasks(recent.dados || [])
+
+          // Load workspace users (top contributors) and compute per-user task progress
+          try {
+            const usersRes = await usuarioServico.listarPorWorkspace(workspaceId, 1, 8)
+            const users = usersRes.dados || usersRes || []
+            setWorkspaceUsers(users)
+            const summaries = users.map((u: any) => {
+              const userTasks = todas.filter((t: any) => {
+                const r = getResponsavelId(t)
+                const c = getCriadorId(t)
+                return r === u.id || c === u.id
+              })
+              const total = userTasks.length
+              const done = userTasks.filter((t: any) => getStatus(t) === 'concluida').length
+              const open = total - done
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0
+              return { usuario: u, total, done, open, pct }
+            })
+            setUserSummaries(summaries)
+          } catch (e) {
+            console.warn('Erro carregando usuários do workspace', e)
+          }
 
           const hist = await historicoServico.porWorkspace(workspaceId, 1, 15)
           setRecentActivities(hist.dados || [])
@@ -218,90 +329,114 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Storage Indicator - Only for workspace view */}
-        {workspace && !projetoAtual && (
-          <StorageIndicator workspace={workspace} />
-        )}
+        {/* Storage Indicator removed from dashboard view */}
 
-        {/* Main Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Tasks */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total de Tarefas</div>
-                <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {stats?.tarefasTotal ?? 0}
-                </div>
-              </div>
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <CheckCircle2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </Card>
-
-          {/* Completed Tasks */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Concluídas</div>
-                <div className="text-3xl font-bold text-green-600">
-                  {stats?.tarefasConcluidas ?? 0}
-                </div>
-                {stats?.taxaConclusao !== undefined && (
-                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    {stats.taxaConclusao}% concluído
+        {/* Top profile / mini-cards like the design */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {userSummaries && userSummaries.length > 0 ? userSummaries.map((s, idx) => {
+            const u = s.usuario
+            const colors = idx===0 ? 'from-blue-500 to-blue-400' : idx===1 ? 'from-slate-800 to-slate-700' : 'from-emerald-400 to-emerald-500'
+            return (
+              <motion.div key={u.id || idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} className={`rounded-2xl p-5 shadow-lg text-white bg-gradient-to-br ${colors}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">{u.nome}</div>
+                    <div className="text-xs opacity-80 mt-1">{u.email || 'User'}</div>
                   </div>
-                )}
-              </div>
-              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <Zap className="w-6 h-6 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </Card>
-
-          {/* In Progress */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Em Progresso</div>
-                <div className="text-3xl font-bold text-yellow-600">
-                  {stats?.tarefasEmProgresso ?? 0}
+                  <Avatar nome={u.nome} src={u.avatar || u.avatarUrl} tamanho="lg" />
                 </div>
-                {stats?.tarefasAtrasadas !== undefined && stats.tarefasAtrasadas > 0 && (
-                  <div className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {stats.tarefasAtrasadas} atrasadas
+                <div className="mt-4">
+                  <div className="text-sm">{s.done} out of {s.total} tasks completed</div>
+                  <div className="mt-2"><ProgressBar valor={s.pct} className="h-2" /></div>
+                </div>
+              </motion.div>
+            )
+          }) : (
+            // fallback to project members if no summaries
+            projetos.slice(0,3).map((p, idx) => (
+              <motion.div key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} className={`rounded-2xl p-5 shadow-lg text-white bg-gradient-to-br ${idx===0?'from-blue-500 to-blue-400':idx===1?'from-slate-800 to-slate-700':'from-emerald-400 to-emerald-500'}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">{p?.nome || 'Projeto'}</div>
+                    <div className="text-xs opacity-80 mt-1">{p?.descricao || ''}</div>
                   </div>
-                )}
-              </div>
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </div>
-          </Card>
+                  <Avatar nome={p?.nome || 'P'} tamanho="lg" />
+                </div>
+                <div className="mt-4">
+                  <div className="text-sm">{p?.tarefasTotal ?? 0} tarefas</div>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
 
-          {/* Active Members or Projects */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                  {workspace && !projetoAtual ? 'Projetos Ativos' : 'Membros Ativos'}
+        {/* Big chart area with performance card */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Tasks Analytics</h3>
+                  <div className="text-sm text-gray-500">tasks created • tasks completed</div>
                 </div>
-                <div className="text-3xl font-bold text-purple-600">
-                  {workspace && !projetoAtual ? stats?.projetosTotal ?? 0 : stats?.membrosAtivos ?? 0}
+                <div>
+                  <select className="px-3 py-1 rounded bg-gray-100 dark:bg-slate-800 text-sm">
+                    <option>Last year</option>
+                    <option>Last 6 months</option>
+                  </select>
                 </div>
               </div>
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                {workspace && !projetoAtual ? (
-                  <FolderKanban className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                ) : (
-                  <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                )}
+              <div className="rounded-xl overflow-hidden bg-slate-900 p-4">
+                <div style={{height:360}} className="w-full">
+                  {chartSeries && chartSeries.length > 0 ? (
+                    // @ts-ignore react-apexcharts typings
+                    <Chart options={chartOptions} series={chartSeries} type="area" height={360} />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">Nenhum dado disponível para o período selecionado</div>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-1">
+            {/* Performance card uses mocked/demo values for now. TODO: wire to real metrics in production */}
+            {(() => {
+              // Performance values derived from `stats` when available; fallback to zeros
+              const perfMock = {
+                score: stats?.taxaConclusao ?? 0,
+                created: stats?.tarefasTotal ?? 0,
+                closed: stats?.tarefasConcluidas ?? 0,
+                progressPct: stats?.taxaConclusao ?? 0
+              }
+              return (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-6 shadow-lg bg-gradient-to-br from-lime-400 to-green-400 text-black">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold">Performance</div>
+                      <div className="text-xs opacity-80">tasks overview</div>
+                    </div>
+                    <div className="text-2xl font-bold">{perfMock.score}</div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="bg-white/20 rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium">Tasks created</div>
+                        <div className="text-lg font-bold">{perfMock.created}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Tasks closed</div>
+                        <div className="text-lg font-bold">{perfMock.closed}</div>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-black/10 rounded-full mt-4 overflow-hidden">
+                      <div style={{width: `${perfMock.progressPct}%`}} className="h-full bg-black/70" />
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })()}
+          </div>
         </div>
 
         {/* Progress Bar */}

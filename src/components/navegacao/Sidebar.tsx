@@ -12,10 +12,13 @@ import {
   CheckSquare,
   Users,
   History,
+  CreditCard,
   GitBranch,
   Calendar,
   FileText,
   Link2,
+  Globe,
+  Server,
   Settings,
   LogOut,
   Sun,
@@ -42,6 +45,7 @@ const navPrincipal: NavItem[] = [
   { nome: 'Projetos', href: '/projetos', icone: <FolderKanban size={22} /> },
   { nome: 'Tarefas', href: '/tarefas', icone: <CheckSquare size={22} /> },
   { nome: 'Usuários', href: '/usuarios', icone: <Users size={22} /> },
+  { nome: 'Financeiro', href: '/financeiro', icone: <CreditCard size={22} /> },
 ];
 
 const navSecundaria: NavItem[] = [
@@ -53,6 +57,8 @@ const navSecundaria: NavItem[] = [
 const navRecursos: NavItem[] = [
   { nome: 'Arquivos', href: '/arquivos', icone: <FileText size={22} /> },
   { nome: 'Links', href: '/links', icone: <Link2 size={22} /> },
+  { nome: 'Domínios', href: '/dominios', icone: <Globe size={22} /> },
+  { nome: 'VPS e Senhas', href: '/vps', icone: <Server size={22} /> },
 ];
 
 export function Sidebar({ collapsed = false, onToggle, onHoverChange }: SidebarProps) {
@@ -96,19 +102,27 @@ export function Sidebar({ collapsed = false, onToggle, onHoverChange }: SidebarP
         );
     }
   };
+  // Routes that should not be prefixed with workspace/project id
+  // Keep empty so all app routes (including '/dominios') are prefixed
+  const globalRoutes: string[] = [];
 
-  const isActive = (href: string) => pathname === (prefix + href) || pathname.startsWith(`${prefix}${href}/`) || pathname.startsWith(href + '/') || pathname === href;
+  const isActive = (href: string) => {
+    const full = globalRoutes.includes(href) ? href : prefix + href;
+    return pathname === full || pathname.startsWith(`${full}/`) || pathname === href || pathname.startsWith(href + '/');
+  };
 
   const renderNavItem = (item: NavItem) => {
     const paddingClasses = collapsed
       ? 'justify-center px-2 group-hover:justify-start group-hover:pl-4 group-hover:pr-3'
       : 'justify-start pl-4 pr-3';
+    const fullHref = globalRoutes.includes(item.href) ? item.href : prefix + item.href;
+
     return (
       <Link
         key={item.href}
-        href={prefix + item.href}
+        href={fullHref}
         className={cn(
-          'flex items-center gap-3 py-2.5 rounded-lg transition-all duration-200 w-full',
+          'flex items-center gap-2 py-2 rounded-lg transition-all duration-200 w-full h-9',
           'text-light-muted dark:text-dark-muted',
           'hover:bg-light-hover dark:hover:bg-dark-hover',
           'hover:text-light-text dark:hover:text-dark-text',
@@ -118,7 +132,7 @@ export function Sidebar({ collapsed = false, onToggle, onHoverChange }: SidebarP
         title={collapsed ? item.nome : undefined}
       >
         <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center transform-none">{item.icone}</span>
-        <span className={cn('font-medium text-base truncate transition-all duration-200 transform', collapsed ? 'hidden group-hover:inline-block group-hover:opacity-100 group-hover:translate-x-0' : 'opacity-100 translate-x-0')}>
+        <span className={cn('font-medium text-sm truncate transition-all duration-200 transform', collapsed ? 'hidden group-hover:inline-block group-hover:opacity-100 group-hover:translate-x-0' : 'opacity-100 translate-x-0')}>
           {item.nome}
         </span>
         {item.badge !== undefined && item.badge > 0 && (
@@ -159,7 +173,7 @@ export function Sidebar({ collapsed = false, onToggle, onHoverChange }: SidebarP
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto py-4 space-y-6">
+      <nav className="flex-1 overflow-y-auto py-4 space-y-2">
         {renderNavSection('Principal', navPrincipal)}
         {renderNavSection('Ferramentas', navSecundaria)}
         {renderNavSection('Recursos', navRecursos)}

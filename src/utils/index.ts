@@ -53,9 +53,10 @@ export function formatarTamanhoArquivo(bytes: number): string {
 
 // Gerar iniciais do nome
 export function gerarIniciais(nome: string): string {
-  return nome
+  if (!nome) return ''
+  return String(nome)
     .split(' ')
-    .map(palavra => palavra[0])
+    .map(palavra => palavra[0] || '')
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -63,15 +64,19 @@ export function gerarIniciais(nome: string): string {
 
 // Truncar texto
 export function truncarTexto(texto: string, maxLength: number): string {
-  if (texto.length <= maxLength) return texto;
-  return `${texto.slice(0, maxLength)}...`;
+  if (!texto) return ''
+  const t = String(texto)
+  if (t.length <= maxLength) return t;
+  return `${t.slice(0, maxLength)}...`;
 }
 
 // Gerar cor baseada em string (para avatars)
-export function stringParaCor(str: string): string {
+export function stringParaCor(str?: string): string {
+  if (!str) return '#7c6be6'
   let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const s = String(str)
+  for (let i = 0; i < s.length; i++) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash);
   }
   
   const cores = [

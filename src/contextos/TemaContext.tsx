@@ -22,7 +22,7 @@ const STORAGE_KEY_SIDEBAR = 'align_sidebar_estilo';
 
 export function TemaProvider({ children }: { children: React.ReactNode }) {
   const [tema, setTemaState] = useState<Tema>('sistema');
-  const [sidebarEstilo, setSidebarEstiloState] = useState<SidebarEstilo>('padrao');
+  const [sidebarEstilo, setSidebarEstiloState] = useState<SidebarEstilo>('glass');
   const [isDark, setIsDark] = useState(false);
 
   // Detectar preferência do sistema

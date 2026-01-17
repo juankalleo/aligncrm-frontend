@@ -319,6 +319,56 @@ export interface CriarWorkspaceDTO {
 }
 
 // ============================================
+// DOMÍNIOS
+// ============================================
+export interface Dominio {
+  id: string;
+  nome: string;
+  porta?: number | null;
+  nginx_server?: string | null;
+  expires_at?: string | null;
+  notified?: boolean;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface CriarDominioDTO {
+  nome: string;
+  porta?: number | null;
+  nginx_server?: string | null;
+  expires_at?: string | null;
+  notified?: boolean;
+}
+
+// ============================================
+// VPS E SENHAS
+// ============================================
+export interface Vps {
+  id: string;
+  nome: string;
+  login_root: string;
+  senha_root?: string | null;
+  email_relacionado?: string | null;
+  storage_gb?: number | null;
+  comprado_em?: string | null; // ISO date
+  comprado_em_local?: string | null; // texto livre onde foi comprado
+  projetos?: Projeto[]; // projetos rodando na VPS
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface CriarVpsDTO {
+  nome: string;
+  login_root: string;
+  senha_root?: string | null;
+  email_relacionado?: string | null;
+  storage_gb?: number | null;
+  comprado_em?: string | null;
+  comprado_em_local?: string | null;
+  projetos_ids?: string[];
+}
+
+// ============================================
 // PERMISSÕES
 // ============================================
 export interface Permissao {
@@ -331,4 +381,34 @@ export interface Permissao {
 export interface RolePermissoes {
   role: Role;
   permissoes: Permissao[];
+}
+
+// ============================================
+// FINANCEIRO
+// ============================================
+export type TipoFinanceiro = 'a_pagar' | 'a_receber';
+
+export interface Financeiro {
+  id: string;
+  projetoId?: string;
+  categoria: string; // 'vps' | 'dominio' | 'custo_projeto' | 'outro'
+  tipo: TipoFinanceiro;
+  descricao?: string;
+  valor: number;
+  data?: string; // ISO date
+  vencimento?: string; // data de cobrança/recebimento (opcional)
+  pago: boolean;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface CriarFinanceiroDTO {
+  projeto_id?: string;
+  categoria: string;
+  tipo: TipoFinanceiro;
+  descricao?: string;
+  valor: number;
+  data?: string;
+  vencimento?: string;
+  pago?: boolean;
 }
