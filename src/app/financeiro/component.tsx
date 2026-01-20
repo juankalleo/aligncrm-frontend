@@ -115,10 +115,11 @@ export default function FinanceiroPage() {
     const hoje = new Date()
     const totals = list.reduce((acc, i) => {
       // se tem vencimento no futuro, não conta ainda
-      const venc = (i as any).vencimento ? new Date(String((i as any).vencimento)) : null
-      if (venc && venc > hoje) return acc
-      if (i.tipo === 'a_pagar') acc.aPagar += Number(i.valor || 0)
-      else acc.aReceber += Number(i.valor || 0)
+        const venc = (i as any).vencimento ? new Date(String((i as any).vencimento)) : null
+        // Exclude future-due items only for pagamentos; incluir receitas futuras em 'A Receber'
+        if (venc && venc > hoje && i.tipo === 'a_pagar') return acc
+        if (i.tipo === 'a_pagar') acc.aPagar += Number(i.valor || 0)
+        else acc.aReceber += Number(i.valor || 0)
       return acc
     }, { aPagar: 0, aReceber: 0 })
     return { ...totals, saldo: totals.aReceber - totals.aPagar }
