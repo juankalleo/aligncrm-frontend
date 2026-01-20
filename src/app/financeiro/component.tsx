@@ -12,11 +12,15 @@ import financeiroServico from '@/servicos/financeiroServico'
 import { Financeiro } from '@/tipos'
 import { Plus, Edit, Trash2, DollarSign, Calendar, CreditCard } from 'lucide-react'
 import { motion } from 'framer-motion'
+import PremiumStatsCard from '@/components/financeiro/PremiumStatsCard'
+import PremiumItemCard from '@/components/financeiro/PremiumItemCard'
+import NovoLancamentoForm from '@/components/financeiro/NovoLancamentoForm'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import useProjetoStore from '@/contextos/ProjetoStore'
 import { format, subMonths } from 'date-fns'
+import PremiumProjectCostsChart from '@/components/financeiro/PremiumProjectCostsChart'
 
 const financeiroSchema = z.object({
   categoria: z.string().min(1),
@@ -66,6 +70,7 @@ export default function FinanceiroPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Financeiro | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const statsRef = useRef<HTMLDivElement | null>(null)
 
   const projetoAtual = useProjetoStore(state => state.projetoAtual)
   const projetos = useProjetoStore(state => state.projetos)
@@ -261,12 +266,12 @@ export default function FinanceiroPage() {
           <Button onClick={() => abrirModal()}><Plus className="w-4 h-4 mr-2"/> Novo Lançamento</Button>
         </div>
 
-        <div className="space-y-6">
+          <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ translateY: -6 }} className="rounded-2xl p-6 shadow-lg bg-gradient-to-r from-blue-500 to-blue-400 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs opacity-90">Available Balance</div>
+                  <div className="text-xs opacity-90">Saldo Disponível</div>
                   <div className="mt-2 text-2xl font-bold">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(totals.saldo)}</div>
                 </div>
                 <div className="text-right">
@@ -297,37 +302,17 @@ export default function FinanceiroPage() {
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ translateY: -6 }} className="rounded-2xl p-6 shadow-md bg-green-500 text-white">
+            <motion.div role="button" tabIndex={0} onClick={() => statsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ translateY: -6 }} className="cursor-pointer rounded-2xl p-6 shadow-md bg-green-500 text-white hover:shadow-lg focus:ring-2 focus:ring-green-400">
               <div className="text-xs opacity-90">Resumo Mensal</div>
               <div className="mt-3">
                 <div className="text-lg font-semibold">Últimos {stacked.monthsArr.length} meses</div>
-                <div className="text-sm opacity-80 mt-2">Visualize o fluxo por categorias no painel.</div>
+                <div className="text-sm opacity-80 mt-2">Clique para ver detalhes e exportar.</div>
               </div>
             </motion.div>
           </div>
 
-          <div className="bg-dark-card p-6 rounded-2xl shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-sm text-slate-300">Statistics</div>
-                <div className="text-xs text-slate-400">Saldo Mensal (últimos meses)</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-2 items-center">
-                  {stacked.categories.map(c => (
-                    <div key={c} className="flex items-center gap-2 text-sm"><span style={{width:12,height:12,background:colorForCategory(c),display:'inline-block',borderRadius:3}}/> {c}</div>
-                  ))}
-                </div>
-                <Button variante="secondary" onClick={() => exportCsv(items)}>Exportar CSV</Button>
-              </div>
-            </div>
-
-            <div>
-              <Chart options={balanceOptions} series={balanceSeries} type="area" height={300} />
-            </div>
-            <div className="mt-6">
-              <Chart options={stackedOptions} series={stackedSeries} type="bar" height={240} />
-            </div>
+          <div ref={statsRef as any}>
+            <PremiumStatsCard balanceOptions={balanceOptions} balanceSeries={balanceSeries} stackedOptions={stackedOptions} stackedSeries={stackedSeries} categories={stacked.categories} exportCsv={exportCsv} items={items} />
           </div>
         </div>
 
@@ -344,68 +329,12 @@ export default function FinanceiroPage() {
             {loading ? <div className="py-6 text-center">Loading...</div> : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map(i => (
-                  <motion.div key={i.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02, y: -4 }} className="group bg-slate-800 rounded-lg p-4 shadow hover:shadow-lg transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-200">
-                          <DollarSign className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">{i.descricao || '—'}</div>
-                          <div className="text-xs text-slate-400">{i.categoria} • {(i as any).projeto_id ? (projetos.find(p=>p.id===(i as any).projeto_id)?.nome || (i as any).projeto_id) : 'Sem projeto'}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-sm font-semibold ${i.tipo === 'a_receber' ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(Number(i.valor || 0))}</div>
-                        <div className="text-xs text-slate-400">{(i as any).vencimento ? String((i as any).vencimento).split('T')[0] : (i.data ? String(i.data).split('T')[0] : '—')}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className={`text-xs ${i.pago ? 'text-emerald-300' : 'text-amber-300'}`}>{i.pago ? 'Pago' : 'Pendente'}</div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button type="button" onClick={() => abrirModal(i)} className="p-1 rounded hover:bg-slate-700"><Edit className="w-4 h-4 text-slate-200"/></button>
-                        <button type="button" onClick={async () => { if (confirm('Remover lançamento?')) { await financeiroServico.excluir(i.id); await carregar() } }} className="p-1 rounded hover:bg-slate-700"><Trash2 className="w-4 h-4 text-slate-200"/></button>
-                      </div>
-                    </div>
-                  </motion.div>
+                  <PremiumItemCard key={i.id} item={i} onEdit={(it:any)=>abrirModal(it)} onDelete={async (it:any) => { if (confirm('Remover lançamento?')) { await financeiroServico.excluir(it.id); await carregar() } }} projetos={projetos} formatCurrency={formatCurrency} />
                 ))}
               </div>
             )}
           </div>
         </Card>
-
-          <Card className="p-4 mt-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="text-sm font-medium">Pendentes</div>
-                <div className="text-xs text-gray-500">Lançamentos com vencimento futuro (não contabilizados no saldo até a data)</div>
-              </div>
-              <div className="text-sm text-gray-500">Total pendente: {formatCurrency(items.filter(i => (i as any).vencimento && new Date(String((i as any).vencimento)) > new Date()).reduce((s, it) => s + Number(it.valor||0) * (it.tipo==='a_receber'?1:-1), 0))}</div>
-            </div>
-            <div className="overflow-auto">
-              <table className="w-full table-auto border-collapse">
-                <thead>
-                  <tr className="text-left text-sm text-light-muted border-b border-light-border dark:border-dark-border">
-                    <th className="py-2 px-2">Descrição</th>
-                    <th className="py-2 px-2">Categoria</th>
-                    <th className="py-2 px-2">Vencimento</th>
-                    <th className="py-2 px-2">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.filter(i => (i as any).vencimento && new Date(String((i as any).vencimento)) > new Date()).map(i => (
-                    <tr key={`${i.id}-pend`} className="border-b border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover">
-                      <td className="py-2 px-2">{i.descricao || '—'}</td>
-                      <td className="py-2 px-2">{i.categoria}</td>
-                      <td className="py-2 px-2">{(i as any).vencimento ? String((i as any).vencimento).split('T')[0] : '—'}</td>
-                      <td className="py-2 px-2">{formatCurrency(Number(i.valor||0))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
 
         <div className="mt-6">
           <Card className="p-4">
@@ -418,29 +347,18 @@ export default function FinanceiroPage() {
             {projectLabels.length === 0 ? (
               <div className="text-sm text-gray-500">Nenhum dado por projeto</div>
             ) : (
-              <Chart options={projectOptions} series={projectSeries} type="bar" height={240} />
+              <PremiumProjectCostsChart data={projectLabels.map(l => {
+                const proj = projetos?.find((p:any) => p.id === l)
+                const displayName = proj ? proj.nome : l
+                return { name: displayName, value: Number((perProjectTotals[l] || 0).toFixed(2)) }
+              })} formatCurrency={formatCurrency} />
             )}
           </Card>
         </div>
 
         <Modal isOpen={modalOpen} onClose={fecharModal} titulo={editing ? 'Editar Lançamento' : 'Novo Lançamento'} tamanho="full">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Input label="Categoria" {...register('categoria' as any)} erro={errors.categoria?.message as any} />
-              <select {...register('tipo' as any)} className="px-4 py-3 rounded-lg bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border">
-                <option value="a_pagar">A Pagar</option>
-                <option value="a_receber">A Receber</option>
-              </select>
-              <ProjectSelector {...register('projeto_id' as any)} />
-              <Controller control={control} name="valor" render={({ field }) => {
-                const [display, setDisplay] = useState('')
-                useEffect(() => setDisplay(field.value ? String(field.value).replace('.', ',') : ''), [field.value])
-                const parseToNumber = (s: string) => { const n = parseFloat(s.replace(/\./g,'').replace(',','.')); return Number.isFinite(n) ? n : NaN }
-                return <Input label="Valor" value={display} onChange={(e:any)=>{ setDisplay(e.target.value); const n = parseToNumber(e.target.value); field.onChange(Number.isFinite(n) ? String(n) : '') }} />
-              }} />
-              <Input label="Vencimento" type="date" {...register('vencimento' as any)} />
-            </div>
-            <div className="flex justify-end gap-3 pt-4"><Button type="button" variante="ghost" onClick={fecharModal}>Cancelar</Button><Button type="submit">{editing ? 'Salvar' : 'Adicionar'}</Button></div>
+            <NovoLancamentoForm register={register} control={control} errors={errors} setValue={setValue} projetos={projetos} onCancel={fecharModal} onSubmit={onSubmit} editing={editing} />
           </form>
         </Modal>
       </div>

@@ -1,9 +1,15 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+// replace apexcharts with recharts for a nicer client-side chart
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
 import dynamic from 'next/dynamic'
 import MainLayout from '@/layouts/MainLayout'
 import { Card, ProgressBar, Avatar, Badge } from '@/components/ui/Elements'
+import StatsCard from '@/components/dashboard/StatsCard'
+import UserCard from '@/components/dashboard/UserCard'
+import PerformanceCard from '@/components/dashboard/PerformanceCard'
+// Replaced `liquid-glass-react` with CSS-based `liquid-card` to avoid positioning transforms
 import { Button } from '@/components/ui'
 import { motion } from 'framer-motion'
 import { 
@@ -31,7 +37,7 @@ import { workspaceServico } from '@/servicos/workspaceServico'
 import { usuarioServico } from '@/servicos'
 
 export default function DashboardPage() {
-  const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+  // Using Recharts (client component) instead of apexcharts for richer visuals
   const projetoAtual = useProjetoStore(state => state.projetoAtual)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
 
@@ -68,6 +74,41 @@ export default function DashboardPage() {
 
           const tarefasRes = await tarefaServico.listarPorProjeto(projetoAtual.id, 1, 100, true)
           const todasTarefas = tarefasRes.dados || []
+
+          // Build chart series from project tasks (created vs completed per month)
+          try {
+            const byMonth: Record<string, { created: number; completed: number }> = {}
+            todasTarefas.forEach((t: any) => {
+              const dt = new Date(t.criadoEm || t.createdAt || t.created_at || t.dataCriacao || t.criado_em || t.dataCriacao)
+              if (isNaN(dt.getTime())) return
+              const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`
+              byMonth[key] = byMonth[key] || { created: 0, completed: 0 }
+              byMonth[key].created += 1
+              if ((t.status && String(t.status) === 'concluida') || (t.concluida === true)) {
+                byMonth[key].completed += 1
+              }
+            })
+
+            // Build last 6 months labels (ensures chart always shows a range)
+            const months = (() => {
+              const out: { key: string; label: string }[] = []
+              const now = new Date()
+              for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                out.push({ key, label: d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }) })
+              }
+              return out
+            })()
+
+            const labels = months.map(m => m.label)
+            const created = months.map(m => (byMonth[m.key]?.created) || 0)
+            const completed = months.map(m => (byMonth[m.key]?.completed) || 0)
+            setChartSeries([{ name: 'created', data: created }, { name: 'completed', data: completed }])
+            setChartOptions({ xaxis: { categories: labels } })
+          } catch (e) {
+            // ignore chart build errors
+          }
           setRecentTasks(todasTarefas.slice(0, 5))
 
           // Calculate task distributions
@@ -103,102 +144,59 @@ export default function DashboardPage() {
           const tarefasPage = await tarefaServico.listarPorWorkspace(workspaceId, 1, 1000, true)
           const todas = tarefasPage.dados || []
 
-          // Build monthly series for last 12 months: created vs completed
+          // Build chart series from workspace tasks (created vs completed per month)
           try {
-            const now = new Date()
-            const months: string[] = []
-            const createdCounts: number[] = []
-            const completedCounts: number[] = []
-
-            for (let i = 11; i >= 0; i--) {
-              const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-              const monthLabel = d.toLocaleString('default', { month: 'short', year: 'numeric' })
-              months.push(monthLabel)
-              const start = new Date(d.getFullYear(), d.getMonth(), 1)
-              const end = new Date(d.getFullYear(), d.getMonth() + 1, 1)
-
-              const created = todas.filter((t: any) => {
-                const c = t.criadoEm || t.created_at || t.criado_em
-                if (!c) return false
-                const cd = new Date(c)
-                return cd >= start && cd < end
-              }).length
-
-              const completed = todas.filter((t: any) => {
-                const status = (typeof t.status === 'string') ? t.status : (t.status && t.status.slug) || (t.status && t.status.nome) || t.status
-                if (status !== 'concluida') return false
-                const u = t.atualizadoEm || t.updated_at || t.atualizado_em || t.criadoEm
-                if (!u) return false
-                const ud = new Date(u)
-                return ud >= start && ud < end
-              }).length
-
-              createdCounts.push(created)
-              completedCounts.push(completed)
-            }
-
-            setChartSeries([
-              { name: 'Created', data: createdCounts },
-              { name: 'Completed', data: completedCounts }
-            ])
-
-            setChartOptions({
-              chart: { toolbar: { show: false }, animations: { enabled: true }, foreColor: '#cbd5e1' },
-              colors: ['#60a5fa', '#34d399'],
-              xaxis: { categories: months },
-              stroke: { curve: 'smooth' },
-              grid: { borderColor: '#0f1724' },
-              tooltip: { theme: 'dark' },
-              legend: { position: 'top' },
+            const byMonth: Record<string, { created: number; completed: number }> = {}
+            todas.forEach((t: any) => {
+              const dt = new Date(t.criadoEm || t.createdAt || t.created_at || t.dataCriacao || t.criado_em || t.dataCriacao)
+              if (isNaN(dt.getTime())) return
+              const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`
+              byMonth[key] = byMonth[key] || { created: 0, completed: 0 }
+              byMonth[key].created += 1
+              if ((t.status && String(t.status) === 'concluida') || (t.concluida === true)) {
+                byMonth[key].completed += 1
+              }
             })
+
+            // Build last 6 months labels (ensures chart always shows a range)
+            const months = (() => {
+              const out: { key: string; label: string }[] = []
+              const now = new Date()
+              for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                out.push({ key, label: d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }) })
+              }
+              return out
+            })()
+
+            const labels = months.map(m => m.label)
+            const created = months.map(m => (byMonth[m.key]?.created) || 0)
+            const completed = months.map(m => (byMonth[m.key]?.completed) || 0)
+            setChartSeries([{ name: 'created', data: created }, { name: 'completed', data: completed }])
+            setChartOptions({ xaxis: { categories: labels } })
           } catch (e) {
-            console.warn('Erro ao gerar séries do gráfico:', e)
+            // ignore chart build errors
           }
 
-          // Helpers to normalize status and priority shapes
+          // Helpers to extract user id from possible task shapes
+          const getResponsavelId = (t: any) => t?.responsavel?.id || t?.responsavelId || t?.responsavel_id || null
+          const getCriadorId = (t: any) => t?.criador?.id || t?.criadorId || t?.criador_id || null
+
+          // Helpers to normalize status/priority and compute derived stats
           const getStatus = (t: any) => {
-            if (!t) return 'unknown'
+            if (!t) return 'pendente'
             if (typeof t.status === 'string') return t.status
-            if (t.status && typeof t.status === 'object') return t.status.slug || t.status.codigo || t.status.nome || (t.status.value && String(t.status.value)) || 'unknown'
-            return t.status || 'unknown'
+            if (t.status && typeof t.status === 'object') return t.status.slug || t.status.nome || String(t.status)
+            return t.status || 'pendente'
           }
+
           const getPriority = (t: any) => {
             if (!t) return 'media'
             if (typeof t.prioridade === 'string') return t.prioridade
             if (t.prioridade && typeof t.prioridade === 'object') return t.prioridade.slug || t.prioridade.nome || 'media'
             return t.prioridade || 'media'
           }
-
-          const tarefasTotal = todas.length
-          const tarefasConcluidas = todas.filter(t => getStatus(t) === 'concluida').length
-          const tarefasEmProgresso = todas.filter(t => getStatus(t) === 'em_progresso').length
-          const tarefasPendentes = todas.filter(t => getStatus(t) === 'pendente').length
-          const tarefasAtrasadas = todas.filter(t => {
-            if (t?.dataVencimento && getStatus(t) !== 'concluida') {
-              const vencimento = new Date(t.dataVencimento)
-              return vencimento < new Date()
-            }
-            return false
-          }).length
-
-          // Calculate task distributions
-          const byStatus = todas.reduce((acc: Record<string, number>, t: any) => {
-            const key = String(getStatus(t) || 'unknown')
-            acc[key] = (acc[key] || 0) + 1
-            return acc
-          }, {})
-          setTasksByStatus(byStatus)
-
-          const byPriority = todas.reduce((acc: Record<string, number>, t: any) => {
-            const key = String(getPriority(t) || 'media')
-            acc[key] = (acc[key] || 0) + 1
-            return acc
-          }, {})
-          setTasksByPriority(byPriority)
-
-          // Helpers to extract user id from possible task shapes
-          const getResponsavelId = (t: any) => t?.responsavel?.id || t?.responsavelId || t?.responsavel_id || null
-          const getCriadorId = (t: any) => t?.criador?.id || t?.criadorId || t?.criador_id || null
 
           // Estimate members active by unique responsavel/creator ids in tasks
           const membroIds = new Set<string>()
@@ -208,6 +206,33 @@ export default function DashboardPage() {
             if (r) membroIds.add(r)
             if (c) membroIds.add(c)
           })
+
+          const tarefasTotal = todas.length
+          const tarefasConcluidas = todas.filter((t: any) => getStatus(t) === 'concluida').length
+          const tarefasEmProgresso = todas.filter((t: any) => getStatus(t) === 'em_progresso').length
+          const tarefasPendentes = todas.filter((t: any) => getStatus(t) === 'pendente').length
+          const tarefasAtrasadas = todas.filter((t: any) => {
+            if ((t as any)?.dataVencimento && getStatus(t) !== 'concluida') {
+              const vencimento = new Date((t as any).dataVencimento)
+              return vencimento < new Date()
+            }
+            return false
+          }).length
+
+          // Calculate task distributions
+          const byStatus = todas.reduce((acc: any, t: any) => {
+            const key = String(getStatus(t) || 'unknown')
+            acc[key] = (acc[key] || 0) + 1
+            return acc
+          }, {})
+          setTasksByStatus(byStatus)
+
+          const byPriority = todas.reduce((acc: any, t: any) => {
+            const key = String(getPriority(t) || 'media')
+            acc[key] = (acc[key] || 0) + 1
+            return acc
+          }, {})
+          setTasksByPriority(byPriority)
 
           setStats({
             tarefasTotal,
@@ -309,8 +334,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <MainLayout showDashboardLogo>
+      <div className="space-y-6 relative">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -333,39 +358,89 @@ export default function DashboardPage() {
 
         {/* Top profile / mini-cards like the design */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {userSummaries && userSummaries.length > 0 ? userSummaries.map((s, idx) => {
-            const u = s.usuario
-            const colors = idx===0 ? 'from-blue-500 to-blue-400' : idx===1 ? 'from-slate-800 to-slate-700' : 'from-emerald-400 to-emerald-500'
-            return (
-              <motion.div key={u.id || idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} className={`rounded-2xl p-5 shadow-lg text-white bg-gradient-to-br ${colors}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-sm font-semibold">{u.nome}</div>
-                    <div className="text-xs opacity-80 mt-1">{u.email || 'User'}</div>
-                  </div>
-                  <Avatar nome={u.nome} src={u.avatar || u.avatarUrl} tamanho="lg" />
-                </div>
-                <div className="mt-4">
-                  <div className="text-sm">{s.done} out of {s.total} tasks completed</div>
-                  <div className="mt-2"><ProgressBar valor={s.pct} className="h-2" /></div>
-                </div>
-              </motion.div>
-            )
-          }) : (
-            // fallback to project members if no summaries
+          <style jsx global>{`
+            /* Enhanced CSS liquid-glass effect (no external lib) */
+            .liquid-card { display: block; }
+            .liquid-card > .rounded-2xl { position: relative; overflow: hidden; border-radius: 16px; }
+
+            /* soft layered backdrop + subtle border gradient */
+            .liquid-card > .rounded-2xl::before {
+              content: '';
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+              pointer-events: none;
+              mix-blend-mode: overlay;
+            }
+
+            .liquid-card > .rounded-2xl {
+              background-clip: padding-box;
+              border: 1px solid rgba(255,255,255,0.05);
+              background-image: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+              backdrop-filter: blur(10px) saturate(120%);
+              -webkit-backdrop-filter: blur(10px) saturate(120%);
+              box-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.02);
+            }
+
+            /* moving sheen to emulate liquid movement */
+            @keyframes sheenMove {
+              0% { transform: translateX(-40%) skewX(-10deg); opacity: 0.05 }
+              50% { transform: translateX(10%) skewX(-6deg); opacity: 0.14 }
+              100% { transform: translateX(120%) skewX(-10deg); opacity: 0.05 }
+            }
+
+            .liquid-card > .rounded-2xl .glass-highlight {
+              position: absolute;
+              top: -20%;
+              left: -40%;
+              width: 200%;
+              height: 90%;
+              background: linear-gradient(90deg, rgba(255,255,255,0.0) 0%, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.0) 70%);
+              pointer-events: none;
+              mix-blend-mode: screen;
+              filter: blur(6px) saturate(120%);
+              transform: rotate(-12deg);
+              animation: sheenMove 4.2s ease-in-out infinite;
+            }
+
+            /* small circular gloss near avatar */
+            .liquid-card > .rounded-2xl .glass-dot {
+              position: absolute;
+              top: 12px;
+              right: 22px;
+              width: 46px;
+              height: 46px;
+              border-radius: 999px;
+              background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.28), rgba(255,255,255,0.06) 40%, transparent 60%);
+              pointer-events: none;
+              box-shadow: 0 3px 8px rgba(0,0,0,0.35) inset;
+            }
+
+            /* subtle inner vignette to enhance depth */
+            .liquid-card > .rounded-2xl::after {
+              content: '';
+              position: absolute;
+              inset: 0;
+              border-radius: inherit;
+              box-shadow: inset 0 10px 30px rgba(0,0,0,0.18);
+              pointer-events: none;
+            }
+
+            /* keep content above decorative layers */
+            .liquid-card > .rounded-2xl > * { position: relative; z-index: 2; }
+          `}</style>
+          
+          {userSummaries && userSummaries.length > 0 ? (
+            userSummaries.map((s, idx) => (
+              <div key={s.usuario?.id || idx} className="max-w-[440px]">
+                <UserCard summary={s} />
+              </div>
+            ))
+          ) : (
             projetos.slice(0,3).map((p, idx) => (
-              <motion.div key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} className={`rounded-2xl p-5 shadow-lg text-white bg-gradient-to-br ${idx===0?'from-blue-500 to-blue-400':idx===1?'from-slate-800 to-slate-700':'from-emerald-400 to-emerald-500'}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-sm font-semibold">{p?.nome || 'Projeto'}</div>
-                    <div className="text-xs opacity-80 mt-1">{p?.descricao || ''}</div>
-                  </div>
-                  <Avatar nome={p?.nome || 'P'} tamanho="lg" />
-                </div>
-                <div className="mt-4">
-                  <div className="text-sm">{p?.tarefasTotal ?? 0} tarefas</div>
-                </div>
-              </motion.div>
+              <div key={idx} className="max-w-[440px]">
+                <StatsCard title={p?.nome || 'Projeto'} value={`${p?.tarefasTotal ?? 0} tarefas`} subtitle={p?.descricao} />
+              </div>
             ))
           )}
         </div>
@@ -376,25 +451,59 @@ export default function DashboardPage() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold">Tasks Analytics</h3>
-                  <div className="text-sm text-gray-500">tasks created • tasks completed</div>
+                  <h3 className="text-lg font-semibold">Análise de Tarefas</h3>
+                  <div className="text-sm text-gray-500">tarefas criadas • tarefas concluídas</div>
                 </div>
-                <div>
-                  <select className="px-3 py-1 rounded bg-gray-100 dark:bg-slate-800 text-sm">
-                    <option>Last year</option>
-                    <option>Last 6 months</option>
-                  </select>
-                </div>
+                <div />
               </div>
               <div className="rounded-xl overflow-hidden bg-slate-900 p-4">
-                <div style={{height:360}} className="w-full">
-                  {chartSeries && chartSeries.length > 0 ? (
-                    // @ts-ignore react-apexcharts typings
-                    <Chart options={chartOptions} series={chartSeries} type="area" height={360} />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500">Nenhum dado disponível para o período selecionado</div>
-                  )}
-                </div>
+                    <div style={{height:360}} className="w-full">
+                      {chartSeries && chartSeries.length > 0 ? (
+                        (() => {
+                          const chartData = (() => {
+                            try {
+                              const s0 = chartSeries[0]?.data || []
+                              const s1 = chartSeries[1]?.data || []
+                              const labels = chartOptions?.xaxis?.categories || s0.map((_: any, i: number) => `#${i+1}`)
+                              return labels.map((lab: any, i: number) => ({ x: lab, created: s0[i] || 0, completed: s1[i] || 0 }))
+                            } catch (e) {
+                              return []
+                            }
+                          })()
+
+                          if (!chartData || chartData.length === 0) return <div className="w-full h-full flex items-center justify-center text-gray-500">Nenhum dado disponível para o período selecionado</div>
+
+                          return (
+                            <ResponsiveContainer width="100%" height={360}>
+                              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <defs>
+                                  <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1}/>
+                                  </linearGradient>
+                                  <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#34d399" stopOpacity={0.1}/>
+                                  </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#0f1724" />
+                                <XAxis dataKey="x" tick={{ fill: '#cbd5e1' }} />
+                                <YAxis tick={{ fill: '#cbd5e1' }} />
+                                <Tooltip wrapperStyle={{ color: '#000' }} formatter={(value: any, name: any) => {
+                                  const label = name === 'created' ? 'Tarefas criadas' : name === 'completed' ? 'Tarefas finalizadas' : name
+                                  return [value, label]
+                                }} />
+                                <Area type="monotone" dataKey="created" name="Tarefas criadas" stroke="#60a5fa" fill="url(#colorCreated)" strokeWidth={2} />
+                                <Area type="monotone" dataKey="completed" name="Tarefas finalizadas" stroke="#34d399" fill="url(#colorCompleted)" strokeWidth={2} />
+                                <Legend formatter={(value: any) => (value === 'created' ? 'Tarefas criadas' : value === 'completed' ? 'Tarefas finalizadas' : value)} />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          )
+                        })()
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500">Nenhum dado disponível para o período selecionado</div>
+                      )}
+                    </div>
               </div>
             </Card>
           </div>
@@ -410,56 +519,38 @@ export default function DashboardPage() {
                 progressPct: stats?.taxaConclusao ?? 0
               }
               return (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-6 shadow-lg bg-gradient-to-br from-lime-400 to-green-400 text-black">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold">Performance</div>
-                      <div className="text-xs opacity-80">tasks overview</div>
-                    </div>
-                    <div className="text-2xl font-bold">{perfMock.score}</div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="bg-white/20 rounded-lg p-3 flex items-center justify-between">
+                <div className="sticky top-24 self-start liquid-card z-20">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-6 shadow-lg bg-gradient-to-br from-lime-400 to-green-400 text-black min-h-[460px] w-full">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium">Tasks created</div>
-                        <div className="text-lg font-bold">{perfMock.created}</div>
+                        <div className="text-sm font-semibold">Performance</div>
+                        <div className="text-xs opacity-80">Visão geral de tarefas</div>
                       </div>
-                      <div>
-                        <div className="text-sm font-medium">Tasks closed</div>
-                        <div className="text-lg font-bold">{perfMock.closed}</div>
+                      <div className="text-2xl font-bold">{perfMock.score}</div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="bg-white/20 rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">Tarefas criadas</div>
+                          <div className="text-lg font-bold">{perfMock.created}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">Tarefas finalizadas</div>
+                          <div className="text-lg font-bold">{perfMock.closed}</div>
+                        </div>
+                      </div>
+                      <div className="h-3 bg-black/10 rounded-full mt-4 overflow-hidden">
+                        <div style={{width: `${perfMock.progressPct}%`}} className="h-full bg-black/70" />
                       </div>
                     </div>
-                    <div className="h-3 bg-black/10 rounded-full mt-4 overflow-hidden">
-                      <div style={{width: `${perfMock.progressPct}%`}} className="h-full bg-black/70" />
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </div>
               )
             })()}
           </div>
         </div>
 
-        {/* Progress Bar */}
-        {stats?.tarefasTotal > 0 && (
-          <Card>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Progresso Geral
-              </span>
-              <span className="text-sm font-bold text-align-600">
-                {stats.taxaConclusao || 0}%
-              </span>
-            </div>
-            <ProgressBar 
-              valor={stats.taxaConclusao || 0} 
-              className="h-3"
-            />
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
-              <span>{stats.tarefasConcluidas} concluídas</span>
-              <span>{stats.tarefasTotal - stats.tarefasConcluidas} restantes</span>
-            </div>
-          </Card>
-        )}
+        {/* Progresso Geral removed per UI request */}
 
         {/* Charts and Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -467,35 +558,31 @@ export default function DashboardPage() {
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <PieChart className="w-5 h-5 text-align-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Tarefas por Status
-              </h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Tarefas por Status</h3>
             </div>
             <div className="space-y-3">
-              {Object.entries(tasksByStatus).map(([status, count]: [string, any]) => {
-                const percentage = stats?.tarefasTotal > 0 
-                  ? Math.round((count / stats.tarefasTotal) * 100) 
-                  : 0
-                const statusLabels: any = {
-                  'pendente': 'Pendente',
-                  'em_progresso': 'Em Progresso',
-                  'concluida': 'Concluída',
-                  'cancelada': 'Cancelada'
-                }
-                return (
-                  <div key={status}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-medium px-2 py-1 rounded ${getStatusColor(status)}`}>
-                        {statusLabels[status] || status}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {count} ({percentage}%)
-                      </span>
+              {(() => {
+                const order = ['concluida', 'em_progresso', 'pendente', 'cancelada']
+                const labels: any = { 'pendente': 'Pendente', 'em_progresso': 'Em Progresso', 'concluida': 'Concluída', 'cancelada': 'Cancelada' }
+                return order.map(status => {
+                  const count = tasksByStatus[status] || 0
+                  const percentage = stats?.tarefasTotal > 0 ? Math.round((count / stats.tarefasTotal) * 100) : 0
+                  return (
+                    <div key={status} className="flex flex-col">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-medium px-2 py-0.5 rounded ${getStatusColor(status)}`}>
+                            {labels[status]}
+                          </span>
+                          <span className="text-xs text-gray-500">{count} tasks</span>
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{percentage}%</div>
+                      </div>
+                      <ProgressBar valor={percentage} className="h-2" />
                     </div>
-                    <ProgressBar valor={percentage} className="h-2" />
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
           </Card>
 
@@ -503,171 +590,40 @@ export default function DashboardPage() {
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="w-5 h-5 text-align-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Tarefas por Prioridade
-              </h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Tarefas por Prioridade</h3>
             </div>
             <div className="space-y-3">
-              {Object.entries(tasksByPriority).map(([prioridade, count]: [string, any]) => {
-                const percentage = stats?.tarefasTotal > 0 
-                  ? Math.round((count / stats.tarefasTotal) * 100) 
-                  : 0
-                const prioridadeLabels: any = {
-                  'alta': 'Alta',
-                  'media': 'Média',
-                  'baixa': 'Baixa'
-                }
-                return (
-                  <div key={prioridade}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-medium px-2 py-1 rounded ${getPriorityColor(prioridade)}`}>
-                        {prioridadeLabels[prioridade] || prioridade}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {count} ({percentage}%)
-                      </span>
+              {(() => {
+                const order = ['alta', 'media', 'baixa']
+                const labels: any = { 'alta': 'Alta', 'media': 'Média', 'baixa': 'Baixa' }
+                return order.map(prioridade => {
+                  const count = tasksByPriority[prioridade] || 0
+                  const percentage = stats?.tarefasTotal > 0 ? Math.round((count / stats.tarefasTotal) * 100) : 0
+                  return (
+                    <div key={prioridade} className="flex flex-col">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-medium px-2 py-0.5 rounded ${getPriorityColor(prioridade)}`}>
+                            {labels[prioridade]}
+                          </span>
+                          <span className="text-xs text-gray-500">{count} tarefas</span>
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{percentage}%</div>
+                      </div>
+                      <ProgressBar valor={percentage} className="h-2" />
                     </div>
-                    <ProgressBar valor={percentage} className="h-2" />
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
           </Card>
         </div>
 
-        {/* Projects List (Workspace view only) */}
-        {workspace && !projetoAtual && projetos.length > 0 && (
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <FolderKanban className="w-5 h-5 text-align-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-white">Projetos</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projetos.map(projeto => (
-                <div 
-                  key={projeto.id} 
-                  className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-align-500 hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="flex items-start gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                      style={{ backgroundColor: projeto.cor || '#7c6be6' }}
-                    >
-                      {projeto.nome.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 dark:text-white truncate">
-                        {projeto.nome}
-                      </h4>
-                      {projeto.descricao && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {projeto.descricao}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+        {/* Projects section removed per UI request */}
 
-        {/* Bottom Section: Recent Tasks and Activities */}
+        {/* Bottom Section: Recent Activities (Recent Tasks removed) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Tasks */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-align-600" />
-                <h3 className="font-semibold text-gray-900 dark:text-white">Tarefas Recentes</h3>
-              </div>
-              <Badge variante="info">{recentTasks.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {recentTasks.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  Nenhuma tarefa encontrada
-                </div>
-              ) : (
-                recentTasks.map(t => (
-                  <div 
-                    key={t.id} 
-                    className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-white truncate">
-                          {t.titulo}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded ${getStatusColor(t.status)}`}>
-                            {t.status}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${getPriorityColor(t.prioridade)}`}>
-                            {t.prioridade}
-                          </span>
-                          {(t as any).dataVencimento && (
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                              <CalendarDays className="w-3 h-3" />
-                              {new Date((t as any).dataVencimento).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          {/* Recent Activities */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-align-600" />
-                <h3 className="font-semibold text-gray-900 dark:text-white">Atividade Recente</h3>
-              </div>
-              <Badge variante="info">{recentActivities.length}</Badge>
-            </div>
-            <div className="space-y-3 max-h-[500px] overflow-y-auto">
-              {recentActivities.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  Nenhuma atividade recente
-                </div>
-              ) : (
-                recentActivities.map(a => (
-                  <div key={a.id} className="flex items-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <Avatar 
-                      nome={a.usuario?.nome || 'Sistema'} 
-                      tamanho="sm"
-                      src={a.usuario?.avatarUrl}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        <span className="font-medium">{a.usuario?.nome || 'Sistema'}</span>
-                        {' '}
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {a.acao || 'atualizou'}
-                        </span>
-                        {' '}
-                        <span className="font-medium">{a.entidadeNome || a.entidade}</span>
-                      </div>
-                      {a.descricao && (
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {a.descricao}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(a.criadoEm || a.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
+          {/* Recent Activities removed per UI request */}
         </div>
       </div>
     </MainLayout>

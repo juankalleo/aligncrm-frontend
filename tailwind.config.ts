@@ -26,9 +26,9 @@ const config: Config = {
           950: '#271d48',
         },
         dark: {
-          bg: '#0d0d0f',
-          card: '#16161a',
-          border: '#27272a',
+          bg: '#000000',
+          card: '#17171d',
+          border: '#131314',
           hover: '#1f1f23',
           text: '#fafafa',
           muted: '#a1a1aa',
