@@ -30,7 +30,7 @@ export const arquivoServico = {
     }
     throw new Error(response.data.mensagem || 'Erro ao listar arquivos do workspace');
   },
-  
+  //teste
   // Upload de arquivo
   async upload(arquivo: File, projetoId?: string, workspaceId?: string): Promise<Arquivo> {
     const formData = new FormData();
